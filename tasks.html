@@ -134,15 +134,23 @@ body.drag{cursor:grabbing}
     try { if (TG.colorScheme === 'dark') document.documentElement.classList.add('dark'); TG.setHeaderColor(TG.colorScheme === 'dark' ? '#0b3a7a' : '#0c66e4'); TG.setBackgroundColor(TG.colorScheme === 'dark' ? '#3e2f7a' : '#6e5dc6'); TG.disableVerticalSwipes && TG.disableVerticalSwipes(); } catch { /* old Telegram */ }
   } else if (matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.classList.add('dark');
 
+  // speed: a «simple» request (text/plain, the signature in the body) goes straight away — with a custom header the
+  // browser first asked the server «may I?» (OPTIONS), one more trip each time. The last board is kept on the phone and
+  // drawn at once on the next opening, then refreshed from the server (per bot and per person: the key has both)
+  const ME = (() => { try { return JSON.parse(new URLSearchParams(INIT).get('user') || '{}').id || ''; } catch { return ''; } })();
+  const CK = 'tk_cache:' + API0 + ':' + ME;
   async function api(body) {
     busy++;
     try {
-      const r = await fetch(API, { method: 'POST', headers: { 'content-type': 'application/json', 'x-tg-init': INIT }, body: JSON.stringify(body) });
+      const r = await fetch(API, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ ...body, _init: INIT }) });
       const j = await r.json().catch(() => ({ error: 'Сервер ответил ' + r.status }));
       if (!r.ok || j.error) throw new Error(j.error || 'Ошибка ' + r.status);
       tasks = j.tasks; today = j.today;
+      if (ME) ls.set(CK, JSON.stringify({ tasks, today }));
     } finally { busy--; draw(); }
   }
+  let cached = false;
+  try { const c = ME && JSON.parse(ls.get(CK) || 'null'); if (c && Array.isArray(c.tasks)) { tasks = c.tasks; today = c.today; cached = true; } } catch { /* no cache */ }
   const run = (body, ok) => api(body).then(() => toast(ok)).catch(e => toast('⚠️ ' + e.message));
   // optimistic: the card moves at once, the server confirms (or the board is redrawn from its answer)
   function move(id, status) {
@@ -304,7 +312,10 @@ body.drag{cursor:grabbing}
   };
 
   if (!INIT || !API.startsWith('http')) { $('#board').innerHTML = '<div class="msg">Откройте доску из бота JUMAVOY: кнопка «📋 Doska» слева от поля ввода.</div>'; $('#stat').textContent = ''; return; }
+  if (cached) draw(); // the last board at once; the fresh one replaces it in a moment
   run({ op: 'list' });
+  // the wallet's data is fetched in the background, so the «👛 Кошелёк» tab opens at once too
+  setTimeout(() => { try { fetch(API.replace(/\/tasks$/, '/wallet'), { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ op: 'list', _init: INIT }) }).then(r => r.ok ? r.json() : null).then(j => { if (j && !j.error && ME) ls.set('wl_cache:' + API0 + ':' + ME, JSON.stringify(j)); }).catch(() => {}); } catch { /* offline */ } }, 1500);
   document.addEventListener('visibilitychange', () => { if (!document.hidden && !busy && !drag.on) run({ op: 'list' }); });
 })();
 </script>

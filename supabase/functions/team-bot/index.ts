@@ -269,9 +269,11 @@ export async function webAppUid(init: string, now = Date.now()): Promise<string 
 export async function miniApi(req: Request, kind: 'tasks' | 'wallet') {
   const out = (v: any, status = 200) => new Response(JSON.stringify(v), { status, headers: { ...CORS, 'Content-Type': 'application/json; charset=utf-8' } });
   if (req.method !== 'POST') return out({ error: 'POST only' }, 405);
-  const uid = await webAppUid(req.headers.get('x-tg-init') || '');
+  // the signature: the x-tg-init header or _init in a text/plain body (a «simple» request — no OPTIONS round trip first)
+  const b0 = await req.json().catch(() => ({})), b = b0 && typeof b0 === 'object' ? b0 : {};
+  const init = req.headers.get('x-tg-init') || (typeof b._init === 'string' ? b._init : ''); delete b._init;
+  const uid = await webAppUid(init);
   if (!uid) return out({ error: 'Ruxsat yoʻq: JUMAVOY botidan oching. / Откройте из бота JUMAVOY.' }, 401);
-  const b = await req.json().catch(() => ({}));
   try { const r = kind === 'tasks' ? await tasksOp(uid, b) : await walletOp(uid, b); return out(r.body, r.status); }
   catch (e) { return out({ error: redact((e as Error).message) }, 500); }
 }
@@ -971,7 +973,7 @@ export async function handle(u: any): Promise<unknown> {
 }
 
 // ───────────────────────────── the cabinet asks for a link code (agent signed in with his login) ─────────────────────────────
-const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type, x-tg-init', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
+const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type, x-tg-init', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Max-Age': '86400' };
 const json = (v: any, status = 200) => new Response(JSON.stringify(v), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 export async function linkApi(req: Request) {
   const tok = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');

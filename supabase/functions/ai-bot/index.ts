@@ -997,13 +997,15 @@ function taskSort(a: any, b: any) {
 }
 async function taskRows(chatId: number, sphere?: string) {
   const since = new Date(Date.now() - DONE_DAYS * 864e5).toISOString();
-  const rows = await sb(`ai_tasks?chat_id=eq.${chatId}&or=(status.eq.todo,status.eq.doing,done_at.gte.${q(since)})&order=id&limit=300`);
-  return withRemind(chatId, (sphere ? rows.filter((r: any) => (r.sphere || 'work') === sphere) : rows).sort(taskSort));
+  // the cards and their reminders are read at the same time (one after the other was ~2 trips to the database)
+  const [rows, rs] = await Promise.all([sb(`ai_tasks?chat_id=eq.${chatId}&or=(status.eq.todo,status.eq.doing,done_at.gte.${q(since)})&order=id&limit=300`), cardReminders(chatId)]);
+  return withRemind(chatId, (sphere ? rows.filter((r: any) => (r.sphere || 'work') === sphere) : rows).sort(taskSort), rs);
 }
+const cardReminders = (chatId: number) => sb(`ai_reminders?chat_id=eq.${chatId}&task_id=gt.0&select=id,task_id,due_at,repeat,sent_at&order=due_at&limit=500`).catch(() => []);
 // a card made from a reminder carries its time: remind = the nearest waiting reminder of that card (else the last sent one)
-async function withRemind(chatId: number, rows: any[]) {
+async function withRemind(chatId: number, rows: any[], pre?: any[]) {
   if (!rows.length) return rows;
-  const rs = await sb(`ai_reminders?chat_id=eq.${chatId}&task_id=gt.0&select=id,task_id,due_at,repeat,sent_at&order=due_at&limit=500`).catch(() => []);
+  const rs = pre || await cardReminders(chatId);
   const by = new Map<number, any>();
   for (const r of rs) { const cur = by.get(r.task_id); if (!cur || (cur.sent_at && !r.sent_at)) by.set(r.task_id, r); }
   return rows.map(t => { const r = by.get(t.id); return r ? { ...t, remind: { id: r.id, at: r.due_at, repeat: r.repeat || undefined, sent: !!r.sent_at } } : t; });
@@ -1445,13 +1447,14 @@ export async function walletOp(chatId: number, b: any): Promise<{ status: number
   else if (b.op === 'del') await sb(`ai_wallet?id=eq.${id}&chat_id=eq.${chatId}`, { method: 'DELETE' });
   else if (b.op && b.op !== 'list') return { status: 400, body: { error: 'Неизвестная операция' } };
   const m = monthOf(/^\d{4}-\d{2}/.test(b.month || '') ? b.month.slice(0, 7) + '-01' : todayStr());
-  const all = b.all ? null : await sb(`ai_wallet?chat_id=eq.${chatId}&select=kind,amount,currency,trip,day&order=day.desc&limit=20000`);
-  const rows = await walletRows(chatId, b.all ? {} : m);
+  // the whole balance, the month, the trips and every trip's totals are read at the same time — one after the other it
+  // was 3 + one trip per trip trips to the database (0.5–2.3 s per opening of the wallet)
+  const [all, rows, st] = await Promise.all([
+    b.all ? null : sb(`ai_wallet?chat_id=eq.${chatId}&select=kind,amount,currency,trip,day,category&order=day.desc&limit=20000`),
+    walletRows(chatId, b.all ? {} : m), tripStore(chatId).catch(() => null)]);
   const src = all || rows;
-  const st = await tripStore(chatId).catch(() => null);
   const near = st ? st.list.filter(t => b.all || (t.from <= m.to && tripEnd(t) >= m.from)).sort((p, q2) => q2.from.localeCompare(p.from)).slice(0, 12) : [];
-  const trip_list = [];
-  for (const t of near) { const s = await tripSummary(chatId, t); trip_list.push({ title: s.trip, from: s.from, to: s.to, live: s.live, days: s.days, count: s.count, totals: s.totals }); }
+  const trip_list = await Promise.all(near.map(async t => { const s = await tripSummary(chatId, t); return { title: s.trip, from: s.from, to: s.to, live: s.live, days: s.days, count: s.count, totals: s.totals }; }));
   return { status: 200, body: { rows, from: b.all ? null : m.from, to: b.all ? null : m.to, today: todayStr(), totals: walletTotals(rows), all_time: walletTotals(src),
     trips: [...new Set([...(st ? [...st.list].sort((p, q2) => q2.from.localeCompare(p.from)).map(tripTitle) : []), ...src.filter((r: any) => r.trip).map((r: any) => r.trip)])].slice(0, 30),
     trip_list, categories: W_CAT, icons: W_ICON } };
@@ -1504,9 +1507,8 @@ async function walletApi(req: Request) {
   const out = (v: any, status = 200) => new Response(JSON.stringify(v), { status, headers: { ...CORS, 'Content-Type': 'application/json; charset=utf-8' } });
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   if (req.method !== 'POST') return out({ error: 'POST only' }, 405);
-  const chatId = await webAppUser(req.headers.get('x-tg-init') || '');
+  const { chatId, b } = await miniAuth(req);
   if (!chatId) return out({ error: 'Нет доступа: откройте кошелёк из бота (👛 Hamyon)' }, 401);
-  const b = await req.json().catch(() => ({}));
   try { const r = await walletOp(chatId, b); return out(r.body, r.status); } catch (e) { return out({ error: (e as Error).message }, 500); }
 }
 // a button under the board: move the card, then redraw the same message
@@ -1913,7 +1915,17 @@ async function appAnswer(chatId: number, b: any, stage?: (s: string) => void): P
     return { status: 500, body: { error: redact((e as Error).message) || 'Ошибка' } };
   } finally { KB.delete(chatId); await usageSettled(); }
 }
-const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type, x-tg-init', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
+// Max-Age: the browser asks «may I?» (OPTIONS) once a day, not before every request (an extra trip to the server each
+// time). The pages now send «simple» requests anyway (text/plain, the signature in the body — see miniAuth)
+const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type, x-tg-init', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Max-Age': '86400' };
+// the board / wallet request: its body and who sent it. The Telegram signature comes in the x-tg-init header (the JUMAVOY
+// app, older pages) or in the body as _init — a text/plain POST with no custom header needs no OPTIONS round trip first
+export async function miniAuth(req: Request): Promise<{ chatId: number | null; b: any }> {
+  const b = await req.json().catch(() => ({}));
+  const init = req.headers.get('x-tg-init') || (typeof b?._init === 'string' ? b._init : '');
+  if (b && typeof b === 'object') delete b._init;
+  return { chatId: await webAppUser(init), b: b && typeof b === 'object' ? b : {} };
+}
 // the board's operations — the same for the Telegram Mini App (tasks.html) and the JUMAVOY app.
 // history = every finished task (nothing is deleted when a card leaves the board after DONE_DAYS)
 export async function tasksOp(chatId: number, b: any): Promise<{ status: number; body: any }> {
@@ -1929,9 +1941,8 @@ async function tasksApi(req: Request) {
   const out = (v: any, status = 200) => new Response(JSON.stringify(v), { status, headers: { ...CORS, 'Content-Type': 'application/json; charset=utf-8' } });
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   if (req.method !== 'POST') return out({ error: 'POST only' }, 405);
-  const chatId = await webAppUser(req.headers.get('x-tg-init') || '');
+  const { chatId, b } = await miniAuth(req);
   if (!chatId) return out({ error: 'Нет доступа: откройте доску из бота (/tasks → 📋 Доска)' }, 401);
-  const b = await req.json().catch(() => ({}));
   try { const r = await tasksOp(chatId, b); return out(r.body, r.status); } catch (e) { return out({ error: (e as Error).message }, 500); }
 }
 

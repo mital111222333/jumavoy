@@ -1165,6 +1165,17 @@ D.test('tasks (kanban): add, board with buttons, move by button, progress → st
   eq(await M.webAppUser(await sign(111)), 111, 'signed owner gets in');
   eq(await M.webAppUser(await sign(999)), null, 'a stranger is refused');
   eq(await M.webAppUser((await sign(111)).replace(/hash=([0-9a-f])/, (_: string, c: string) => 'hash=' + (c === '0' ? '1' : '0'))), null, 'a forged hash is refused');
+  // 27.11 speed: the pages send a «simple» text/plain request with the signature in the body (no OPTIONS trip first)
+  const plain = async (path: string, body: any) => await M.serve(new Request('https://x/functions/v1/ai-bot/' + path, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify(body) }));
+  const pt = await plain('tasks', { op: 'list', _init: await sign(111) });
+  eq(pt.status, 200, 'text/plain + _init → the board'); assert(Array.isArray((await pt.json()).tasks), 'tasks in the answer');
+  eq((await plain('tasks', { op: 'list', _init: await sign(999) })).status, 401, 'a stranger in the body is refused too');
+  eq((await plain('tasks', { op: 'list' })).status, 401, 'no signature anywhere → 401');
+  DB.ai_wallet = DB.ai_wallet || [];
+  const pw = await plain('wallet', { op: 'list', _init: await sign(111) });
+  eq(pw.status, 200, 'the wallet the same way: ' + (pw.status === 200 ? '' : await pw.clone().text())); assert(Array.isArray((await pw.json()).rows), 'wallet rows');
+  const pre = await M.serve(new Request('https://x/functions/v1/ai-bot/tasks', { method: 'OPTIONS' }));
+  eq(pre.headers.get('access-control-max-age'), '86400', 'the browser keeps the «may I?» answer for a day');
   const api = (init: string, body: any) => M.serve(new Request('https://x/functions/v1/ai-bot/tasks', { method: 'POST', headers: { 'x-tg-init': init, 'content-type': 'application/json' }, body: JSON.stringify(body) }));
   eq((await api('', { op: 'list' })).status, 401, 'no signature → 401');
   const added = await (await api(await sign(111), { op: 'add', title: 'С доски' })).json();

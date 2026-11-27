@@ -120,11 +120,18 @@ h3{margin:0 0 10px;font-size:14px}
   } else if (matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.classList.add('dark');
   $('#toBoard').href = 'tasks.html' + location.search;
 
+  // speed: a «simple» request (text/plain, the signature in the body) — no «may I?» (OPTIONS) trip before it; the
+  // current month is kept on the phone and drawn at once on the next opening, then refreshed from the server
+  const ME = (() => { try { return JSON.parse(new URLSearchParams(INIT).get('user') || '{}').id || ''; } catch { return ''; } })();
+  const CK = 'wl_cache:' + API0 + ':' + ME;
+  const ls = { get: k => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* private mode */ } } };
   async function api(body) {
-    const r = await fetch(API, { method: 'POST', headers: { 'content-type': 'application/json', 'x-tg-init': INIT }, body: JSON.stringify({ month, ...body }) });
+    const r = await fetch(API, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ month, ...body, _init: INIT }) });
     const j = await r.json().catch(() => ({ error: 'Сервер ответил ' + r.status }));
     if (!r.ok || j.error) throw new Error(j.error || 'Ошибка ' + r.status);
-    D = j; if (!month) month = j.from.slice(0, 7); draw();
+    D = j; if (!month) month = j.from.slice(0, 7);
+    if (ME && j.from && j.today && j.from.slice(0, 7) === j.today.slice(0, 7)) ls.set(CK, JSON.stringify(j));
+    draw();
   }
   const run = (body, ok) => api(body).then(() => toast(ok)).catch(e => toast('⚠️ ' + e.message));
   const shift = k => { const [y, m] = month.split('-').map(Number), d = new Date(Date.UTC(y, m - 1 + k, 1)); month = d.toISOString().slice(0, 7); haptic(); run({ op: 'list' }); };
@@ -209,7 +216,14 @@ h3{margin:0 0 10px;font-size:14px}
   };
 
   if (!INIT || !API) { $('#hist').innerHTML = '<div class="empty">Откройте кошелёк из бота JUMAVOY: кнопка «👛 Hamyon» или команда /hamyon.</div>'; $('#fab').hidden = true; return; }
+  // the current month from the phone at once (it is the same month as now), the fresh one from the server right after
+  try {
+    const c = ME && JSON.parse(ls.get(CK) || 'null'), now = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent', year: 'numeric', month: '2-digit' }).format(new Date()).slice(0, 7);
+    if (c && Array.isArray(c.rows) && c.from && c.from.slice(0, 7) === now) { D = c; month = now; draw(); }
+  } catch { /* no cache */ }
   run({ op: 'list' });
+  // the board's data in the background, so «📋 Доска» opens at once too
+  setTimeout(() => { try { fetch(API.replace(/\/wallet$/, '/tasks'), { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ op: 'list', _init: INIT }) }).then(r => r.ok ? r.json() : null).then(j => { if (j && Array.isArray(j.tasks) && ME) ls.set('tk_cache:' + API0 + ':' + ME, JSON.stringify({ tasks: j.tasks, today: j.today })); }).catch(() => {}); } catch { /* offline */ } }, 1500);
   document.addEventListener('visibilitychange', () => { if (!document.hidden && !sheet.classList.contains('on')) run({ op: 'list' }); });
 })();
 </script>

@@ -356,3 +356,9 @@ Mital AI — уже не только рабочий бот: сферы work / p
 - **crm_query** с неверным полем (`В debtors нет полей: region`) → `retry` к ИИ с полями, а не ответ владельцу.
 - **💱 Обмен валют** — категория `Обмен` (`W_FX`, по заметке «обмен / valyuta almashtirish»): не приход и не расход, меняет только остаток каждой валюты; не попадает в категории и в приходы командировки. Старые записи #16/#17 владельца (25.11) остались «Прочее»/«Возврат» — поправить по его OK.
 - Тесты 75/75 (6 новых «27.11 audit …», старый тест будильника в Telegram обновлён), `deno check`, `deno lint` чисто. С настоящим Gemini не проверено (нет ключа в среде).
+
+## 27.11.2026: JUMAVOY в своём репозитории (Opus 5.5)
+- Репозиторий **mital111222333/jumavoy** (локально `D:\MITAL TEAM\jumavoy`): ai-bot, team-bot, tasks.html, wallet.html, jumavoy/, android/, их тесты и миграции таблиц бота — с историей (79 коммитов). CRM — mital111222333/MitalCRM, связь только через общую базу Supabase (bot.json.gz, crm_inbox, agent_cabinets), см. README.
+- Выкладка — `checks` этого репозитория (секрет `SUPABASE_ACCESS_TOKEN`); в MitalCRM задачи выкладки ботов убраны, чтобы старая копия не затирала новую.
+- Mini App: `https://mital111222333.github.io/jumavoy/tasks.html`, `/wallet.html`, `/jumavoy/`. Старые адреса в MitalCRM — переадресация с ?api= и #tgWebAppData; старый sw.js сам удаляется. APK — релиз `jumavoy-app` этого репозитория (без `ANDROID_KEYSTORE_PASS` — debug-ключ).
+- Deploy из `D:\MITAL TEAM\jumavoy` (не MitalCRM): `npx.cmd supabase functions deploy ai-bot --project-ref oxchgcfyzszemqlvdjjr --no-verify-jwt`.

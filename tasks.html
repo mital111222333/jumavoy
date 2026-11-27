@@ -113,7 +113,10 @@ body.drag{cursor:grabbing}
   const TG = window.Telegram && Telegram.WebApp, $ = s => document.querySelector(s);
   // the Telegram signature (initData) goes only to a Supabase function: a changed ?api= link cannot collect it elsewhere
   const API0 = (new URLSearchParams(location.search).get('api') || '').replace(/\/$/, '');
-  const API = /^https:\/\/[a-z0-9-]+\.supabase\.co\/functions\/v1\/[\w-]+$/i.test(API0) ? API0 + '/tasks' : '';
+  // the function runs next to the database (Singapore): from Uzbekistan it ran in Frankfurt, and every read of the
+  // database crossed half the world. ?forceFunctionRegion keeps the request «simple» (a header would need OPTIONS)
+  const REG = '?forceFunctionRegion=ap-southeast-1';
+  const API = /^https:\/\/[a-z0-9-]+\.supabase\.co\/functions\/v1\/[\w-]+$/i.test(API0) ? API0 + '/tasks' + REG : '';
   const COLS = [['todo', 'Нужно сделать', '#8590a2'], ['doing', 'В процессе', '#0c66e4'], ['done', 'Готово', '#1f845a']];
   const ST = Object.fromEntries(COLS.map(([s, l]) => [s, l]));
   const SPH = { work: ['💼 Работа', 'var(--teal)'], personal: ['👤 Личное', 'var(--purple)'], family: ['👨‍👩‍👧 Семья', 'var(--pink)'], friends: ['🤝 Друзья', 'var(--lime)'], ideas: ['💡 Идеи', 'var(--amber)'] };
@@ -315,7 +318,7 @@ body.drag{cursor:grabbing}
   if (cached) draw(); // the last board at once; the fresh one replaces it in a moment
   run({ op: 'list' });
   // the wallet's data is fetched in the background, so the «👛 Кошелёк» tab opens at once too
-  setTimeout(() => { try { fetch(API.replace(/\/tasks$/, '/wallet'), { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ op: 'list', _init: INIT }) }).then(r => r.ok ? r.json() : null).then(j => { if (j && !j.error && ME) ls.set('wl_cache:' + API0 + ':' + ME, JSON.stringify(j)); }).catch(() => {}); } catch { /* offline */ } }, 1500);
+  setTimeout(() => { try { fetch(API0 + '/wallet' + REG, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ op: 'list', _init: INIT }) }).then(r => r.ok ? r.json() : null).then(j => { if (j && !j.error && ME) ls.set('wl_cache:' + API0 + ':' + ME, JSON.stringify(j)); }).catch(() => {}); } catch { /* offline */ } }, 1500);
   document.addEventListener('visibilitychange', () => { if (!document.hidden && !busy && !drag.on) run({ op: 'list' }); });
 })();
 </script>

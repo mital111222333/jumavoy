@@ -103,7 +103,9 @@ h3{margin:0 0 10px;font-size:14px}
 (() => {
   const TG = window.Telegram && Telegram.WebApp, $ = s => document.querySelector(s);
   const API0 = (new URLSearchParams(location.search).get('api') || '').replace(/\/$/, '');
-  const API = /^https:\/\/[a-z0-9-]+\.supabase\.co\/functions\/v1\/[\w-]+$/i.test(API0) ? API0 + '/wallet' : '';
+  // the function runs next to the database (Singapore), not in Frankfurt — see tasks.html
+  const REG = '?forceFunctionRegion=ap-southeast-1';
+  const API = /^https:\/\/[a-z0-9-]+\.supabase\.co\/functions\/v1\/[\w-]+$/i.test(API0) ? API0 + '/wallet' + REG : '';
   // the signature survives going board ⇄ wallet inside the same Mini App (telegram-web-app.js keeps it too)
   const ss = { get: k => { try { return sessionStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { sessionStorage.setItem(k, v); } catch { /* private mode */ } } };
   const INIT = (TG && TG.initData) || ss.get('jv_init') || ''; if (INIT) ss.set('jv_init', INIT);
@@ -223,7 +225,7 @@ h3{margin:0 0 10px;font-size:14px}
   } catch { /* no cache */ }
   run({ op: 'list' });
   // the board's data in the background, so «📋 Доска» opens at once too
-  setTimeout(() => { try { fetch(API.replace(/\/wallet$/, '/tasks'), { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ op: 'list', _init: INIT }) }).then(r => r.ok ? r.json() : null).then(j => { if (j && Array.isArray(j.tasks) && ME) ls.set('tk_cache:' + API0 + ':' + ME, JSON.stringify({ tasks: j.tasks, today: j.today })); }).catch(() => {}); } catch { /* offline */ } }, 1500);
+  setTimeout(() => { try { fetch(API0 + '/tasks' + REG, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ op: 'list', _init: INIT }) }).then(r => r.ok ? r.json() : null).then(j => { if (j && Array.isArray(j.tasks) && ME) ls.set('tk_cache:' + API0 + ':' + ME, JSON.stringify({ tasks: j.tasks, today: j.today })); }).catch(() => {}); } catch { /* offline */ } }, 1500);
   document.addEventListener('visibilitychange', () => { if (!document.hidden && !sheet.classList.contains('on')) run({ op: 'list' }); });
 })();
 </script>

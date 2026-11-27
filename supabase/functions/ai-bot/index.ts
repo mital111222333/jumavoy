@@ -7273,7 +7273,10 @@ async function handle(u: any) {
     const res = await ask(db, chatId, parts, qText, fileInfo, false, showStage);
     if (savedNote) res.text = `${savedNote}\n\n${res.text}`;
     if (heard) res.text = `🎤 «${heard0}»\n\n` + res.text.replace(/^🎤\s*«[^»]*»\s*/, '');
-    console.log('ok', Date.now() - t0, 'ms', 'gemini requests:', res.requests, res.used.join(','), voice ? `stt ${LAST_STT.model} ${LAST_STT.ms} ms` : '');
+    // where the time went: the AI steps, the functions, the rest (database, Telegram, voice); the region — to compare
+    // Singapore (next to the database) with the nearest region (FN_REGION) on real answers
+    const tr = (res.trace || []) as any[], aiMs = tr.filter(x => x.m).reduce((s, x) => s + n(x.ms), 0), toolMs = tr.filter(x => x.tool).reduce((s, x) => s + n(x.ms), 0);
+    console.log('ok', Date.now() - t0, 'ms', 'gemini requests:', res.requests, res.used.join(','), voice ? `stt ${LAST_STT.model} ${LAST_STT.ms} ms` : '', `| ai ${aiMs} ms tools ${toolMs} ms region ${env('SB_REGION', '?')}`);
     if (key && !res.used.some(x => WRITES.has(x))) { ANS.set(key, { at: Date.now(), text: res.text, mem: (await getHistory(chatId)).at(-1)?.parts?.[0]?.text }); if (ANS.size > 200) ANS.clear(); }
     await usageSettled(); // the day's total for the «🔋 Лимит» line
     if (!KB.has(chatId)) { const fk = followKeyboard(res.used, res.text); if (fk) KB.set(chatId, fk); }

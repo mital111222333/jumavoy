@@ -19,7 +19,7 @@ import java.util.Map;
 
 /**
  * The JUMAVOY page comes from the phone itself, so the app opens at once — with a bad connection or none at all.
- * The address stays https://mital111222333.github.io/MitalCRM/jumavoy/ (the personal link and the chat history kept by
+ * The address stays https://mital111222333.github.io/jumavoy/jumavoy/ (the personal link and the chat history kept by
  * the page live there), but the files are given from the app: the newest copy downloaded from GitHub (files/web/),
  * otherwise the copy built into the APK (assets/web/). In the background the app downloads a newer page; it is used the
  * next time JUMAVOY is opened. Questions to the bot are not touched here (another address, they need the internet).

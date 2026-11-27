@@ -988,7 +988,7 @@ const DONE_DAYS = 7; // done cards stay on the board this long
 const KB = new Map<number, any>();
 const short = (s: string, k: number) => (s.length > k ? s.slice(0, k - 1) + '…' : s);
 export const tasksUrl = () => {
-  const base = env('TASKS_URL', 'https://mital111222333.github.io/MitalCRM/tasks.html'), fn = env('SUPABASE_URL') ? `${env('SUPABASE_URL')}/functions/v1/ai-bot` : '';
+  const base = env('TASKS_URL', 'https://mital111222333.github.io/jumavoy/tasks.html'), fn = env('SUPABASE_URL') ? `${env('SUPABASE_URL')}/functions/v1/ai-bot` : '';
   return fn ? `${base}${base.includes('?') ? '&' : '?'}api=${q(fn)}` : base;
 };
 function taskSort(a: any, b: any) {
@@ -1178,7 +1178,7 @@ export const W_ICON: Record<string, string> = { 'Еда': '🍽', 'Бензин'
 export const W_FX = 'Обмен';
 const FX_RE = /обмен|конверт|valyuta|almashtir|ayirboshla|alishtir|dollar\s*(sotdim|almashtir)/i;
 export const walletUrl = () => {
-  const base = env('WALLET_URL', 'https://mital111222333.github.io/MitalCRM/wallet.html'), fn = env('SUPABASE_URL') ? `${env('SUPABASE_URL')}/functions/v1/ai-bot` : '';
+  const base = env('WALLET_URL', 'https://mital111222333.github.io/jumavoy/wallet.html'), fn = env('SUPABASE_URL') ? `${env('SUPABASE_URL')}/functions/v1/ai-bot` : '';
   return fn ? `${base}${base.includes('?') ? '&' : '?'}api=${q(fn)}` : base;
 };
 export const walletButton = () => ({ text: '👛 Hamyon', web_app: { url: walletUrl() } });
@@ -1630,7 +1630,7 @@ export async function webAppUser(init: string, now = Date.now()): Promise<number
 //   { op: 'memory' }        → { items }                   what JUMAVOY remembers; { op: 'forget', id } deletes one record
 //   …, stream: true         → NDJSON: {stage} lines while working, then the answer with done: true
 // Drafts to agents / clients still come to Telegram with «✅ Отправить» — nothing reaches people from the app by itself.
-export const APP_URL = () => env('APP_URL', 'https://mital111222333.github.io/MitalCRM/jumavoy/');
+export const APP_URL = () => env('APP_URL', 'https://mital111222333.github.io/jumavoy/jumavoy/');
 export async function appKey(chatId: number | string) {
   return [...await hmacRaw(new TextEncoder().encode(CFG.secret() || 'x'), `jumavoy-app:${chatId}`)].slice(0, 16).map(b => b.toString(16).padStart(2, '0')).join('');
 }
@@ -6178,7 +6178,7 @@ async function command(text: string, chatId: number): Promise<string | null> {
   if (cmd === 'fon' || cmd === 'bg') { const r: any = await bgControl(chatId, n(arg) > 0 ? { id: n(arg), action: 'status' } : { action: 'status' }); return r.error || r.text; }
   if (cmd === 'pings') return pingsCommand(chatId, arg);
   if (cmd === 'app') KB.set(chatId, appButton());
-  if (cmd === 'app') return `✨ Внутри Telegram — кнопка ниже (или «${CFG.name}» слева от поля ввода), ссылка не нужна.\n\n📱 Приложение ${CFG.name} — тот же помощник без Telegram, с кнопкой микрофона и ответами голосом.\n\nВаша личная ссылка (никому не пересылайте):\n${await appLink(chatId)}\n\nОткройте её в Chrome → ⋮ → «Добавить на главный экран». Для Android-приложения (вызов кнопкой питания, как Gemini): ${env('APK_URL', 'https://github.com/mital111222333/MitalCRM/releases/download/jumavoy-app/JUMAVOY.apk')} — в нём один раз вставьте эту же ссылку.`;
+  if (cmd === 'app') return `✨ Внутри Telegram — кнопка ниже (или «${CFG.name}» слева от поля ввода), ссылка не нужна.\n\n📱 Приложение ${CFG.name} — тот же помощник без Telegram, с кнопкой микрофона и ответами голосом.\n\nВаша личная ссылка (никому не пересылайте):\n${await appLink(chatId)}\n\nОткройте её в Chrome → ⋮ → «Добавить на главный экран». Для Android-приложения (вызов кнопкой питания, как Gemini): ${env('APK_URL', 'https://github.com/mital111222333/jumavoy/releases/download/jumavoy-app/JUMAVOY.apk')} — в нём один раз вставьте эту же ссылку.`;
   if (cmd === 'learn' || cmd === 'uchis') return learnedText(await learnFromChat(chatId, n(arg) > 0 ? Math.min(n(arg), 60) * 24 : 24));
   if (cmd === 'reminders') return run('reminder_list', {});
   if (cmd === 'my') return run('personal_debts', arg ? { person: arg } : {});

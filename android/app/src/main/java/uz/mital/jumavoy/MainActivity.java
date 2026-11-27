@@ -37,7 +37,7 @@ import java.util.regex.Pattern;
  * it can be pasted on the first screen or shared to JUMAVOY from Telegram.
  */
 public class MainActivity extends Activity {
-  static final String BASE = "https://mital111222333.github.io/MitalCRM/jumavoy/";
+  static final String BASE = "https://mital111222333.github.io/jumavoy/jumavoy/";
   static final int MIC = 1, MIC_NATIVE = 2, PICK = 3, MIC_ASK = 4;
   ValueCallback<Uri[]> fileCb; // the page waits for the chosen files
   Uri cameraUri;               // where the camera puts a new photo

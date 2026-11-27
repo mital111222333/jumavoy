@@ -154,8 +154,8 @@ const daysSince = (d: any) => d ? Math.round((Date.parse(todayStr()) - Date.pars
 // team_tasks / team_wallet (migration 20261124000002_team_tasks_wallet.sql), rows of the agent's login (user_id). The same
 // Mini Apps as the owner's (tasks.html, wallet.html with ?api=<function url of team-bot>) → /tasks and /wallet here, signed
 // with the team bot's initData. Nobody but the agent himself reaches them; the owner's tasks and money are in other tables.
-export const tasksUrl = () => `${env('TEAM_TASKS_URL', 'https://mital111222333.github.io/MitalCRM/tasks.html')}?api=${q(`${CFG.sbUrl()}/functions/v1/team-bot`)}`;
-export const walletUrl = () => `${env('TEAM_WALLET_URL', 'https://mital111222333.github.io/MitalCRM/wallet.html')}?api=${q(`${CFG.sbUrl()}/functions/v1/team-bot`)}`;
+export const tasksUrl = () => `${env('TEAM_TASKS_URL', 'https://mital111222333.github.io/jumavoy/tasks.html')}?api=${q(`${CFG.sbUrl()}/functions/v1/team-bot`)}`;
+export const walletUrl = () => `${env('TEAM_WALLET_URL', 'https://mital111222333.github.io/jumavoy/wallet.html')}?api=${q(`${CFG.sbUrl()}/functions/v1/team-bot`)}`;
 export const boardButton = () => ({ text: '📋 Doska', web_app: { url: tasksUrl() } });
 export const walletButton = () => ({ text: '👛 Hamyon', web_app: { url: walletUrl() } });
 const SPHERES = ['work', 'personal', 'family', 'friends', 'ideas'];

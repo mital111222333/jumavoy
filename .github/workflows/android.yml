@@ -1,5 +1,5 @@
 # JUMAVOY for Android: builds the APK from android/ and puts it on the release «jumavoy-app»:
-#   https://github.com/mital111222333/MitalCRM/releases/download/jumavoy-app/JUMAVOY.apk
+#   https://github.com/mital111222333/jumavoy/releases/download/jumavoy-app/JUMAVOY.apk
 # Signing: with the repository secret ANDROID_KEYSTORE_PASS (16+ characters) the permanent key is made from it on every
 # build (android/tools/signing_key.py, nothing is stored) — every new APK installs over the old one. Without the secret:
 # a one-off debug key (a new build needs the old app removed first).

@@ -6518,15 +6518,25 @@ async function sendExport(db: any, chatId: number) {
 
 // ───────────────────────────── schedule (pg_cron calls ?cron=1 every minute, see cron.sql) ─────────────────────────────
 // the webhook was set up for messages only: button presses (callback_query) must be delivered too — fixed once, by itself
+// 27.11: the function runs next to the database. Telegram's servers are in the Netherlands, so its webhook ran in
+// Frankfurt and every one of the ~17 database reads of an answer went to Singapore and back (170–520 ms each instead of
+// ~25). FN_REGION (default ap-southeast-1 — the database's region) is added to the webhook address as
+// ?forceFunctionRegion=…; FN_REGION=off puts the webhook back to the nearest region. Changed by the next tick by itself
+export const fnRegion = () => { const r = env('FN_REGION', 'ap-southeast-1').trim(); return /^[a-z]{2}-[a-z]+-\d$/.test(r) ? r : ''; };
+export function hookUrl(base: string) {
+  const u = new URL(base); u.searchParams.delete('forceFunctionRegion');
+  if (fnRegion()) u.searchParams.set('forceFunctionRegion', fnRegion());
+  return u.toString();
+}
 let hookOk = false;
 async function ensureWebhook() {
   if (hookOk) return;
   const i = (await tg('getWebhookInfo', {}))?.result;
   if (!i?.url) return;
-  const want = ['message', 'edited_message', 'callback_query'];
-  if (want.every(k => (i.allowed_updates || want).includes(k))) { hookOk = true; return; }
-  const r = await tg('setWebhook', { url: i.url, secret_token: CFG.secret(), allowed_updates: want });
-  hookOk = !!r?.ok; console.log('webhook: buttons enabled', r?.ok);
+  const want = ['message', 'edited_message', 'callback_query'], url = hookUrl(i.url);
+  if (url === i.url && want.every(k => (i.allowed_updates || want).includes(k))) { hookOk = true; return; }
+  const r = await tg('setWebhook', { url, secret_token: CFG.secret(), allowed_updates: want });
+  hookOk = !!r?.ok; console.log('webhook:', url === i.url ? 'buttons enabled' : 'region ' + (fnRegion() || 'nearest'), r?.ok);
 }
 // 25.11.2026, once: the owner's Namangan trip 23–25.11 was written as «Komandirovka» and «Namangan» with wrong categories
 // (Otel → Прочее, money from Adhamjon → Бизнес / Возврат, «Komandirovkaga pul» → Прочее). One trip «Namangan», fixed categories.
@@ -7304,7 +7314,7 @@ async function serve(req: Request) {
   if (req.method === 'GET') {
     // one-time setup: open <function url>?setup=<TG_SECRET> in a browser
     if (CFG.secret() && url.searchParams.get('setup') === CFG.secret()) {
-      const hook = env('SUPABASE_URL') ? `${env('SUPABASE_URL')}/functions/v1/ai-bot` : `https://${url.host}/functions/v1/ai-bot`;
+      const hook = hookUrl(env('SUPABASE_URL') ? `${env('SUPABASE_URL')}/functions/v1/ai-bot` : `https://${url.host}/functions/v1/ai-bot`);
       const r = await tg('setWebhook', { url: hook, secret_token: CFG.secret(), allowed_updates: ['message', 'edited_message', 'callback_query'], drop_pending_updates: true });
       const c = await tg('setMyCommands', { commands: COMMANDS });
       const menu: Record<string, unknown> = {};

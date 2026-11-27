@@ -2608,3 +2608,13 @@ D.test('27.11 audit: a wrong crm_query filter goes back to the AI (retry), not t
   const r = await M.TOOLS.crm_query.run(db, { path: 'debtors', filter: 'region=Fargona' });
   assert(r.retry && /нет полей: region/.test(r.error) && r.fields && typeof r.fields === 'object', JSON.stringify(r).slice(0, 300));
 });
+
+D.test('27.11 speed: the webhook runs next to the database (Singapore); FN_REGION=off puts it back', () => {
+  const base = 'https://sb.test/functions/v1/ai-bot';
+  eq(M.hookUrl(base), base + '?forceFunctionRegion=ap-southeast-1', 'default: the database region');
+  eq(M.hookUrl(base + '?forceFunctionRegion=eu-central-1'), base + '?forceFunctionRegion=ap-southeast-1', 'an old region is replaced, not doubled');
+  D.env.set('FN_REGION', 'off');
+  try { eq(M.hookUrl(base + '?forceFunctionRegion=ap-southeast-1'), base, 'off → the nearest region again'); } finally { D.env.delete('FN_REGION'); }
+  D.env.set('FN_REGION', 'x; rm');
+  try { eq(M.hookUrl(base), base, 'a broken value is ignored'); } finally { D.env.delete('FN_REGION'); }
+});
